@@ -1,0 +1,7 @@
+1. Abra Google Sheets.
+2. Extensiones > Apps Script.
+3. Pegue Code.gs e Index.html.
+4. Despliegue como aplicacion web.
+5. Cree el primer ADMINISTRADOR.
+6. Suba los HTML desde el panel.
+Consulte Tutorial_Sistema_HTML_Seguro.pdf para el paso a paso completo.

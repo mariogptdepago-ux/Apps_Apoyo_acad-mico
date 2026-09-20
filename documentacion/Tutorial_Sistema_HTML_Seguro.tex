@@ -1,0 +1,402 @@
+\documentclass[aspectratio=169,11pt]{beamer}
+\usetheme{Madrid}
+\usecolortheme{default}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish]{babel}
+\usepackage{lmodern}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.rounded}
+
+\definecolor{azul}{RGB}{8,120,201}
+\definecolor{verde}{RGB}{88,204,2}
+\definecolor{gris}{RGB}{96,112,128}
+\definecolor{fondo}{RGB}{246,251,255}
+\setbeamercolor{structure}{fg=azul}
+\setbeamercolor{frametitle}{fg=white,bg=azul}
+\setbeamercolor{title}{fg=white,bg=azul}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}[frame number]
+
+\title[Sistema HTML Seguro]{Sistema HTML Seguro con Google Apps Script}
+\subtitle{Carga, activación, usuarios, roles e informes con una interfaz de clics}
+\author{Tutorial de configuración y uso}
+\date{Versión 1.0}
+
+\newcommand{\boton}[1]{\textcolor{azul}{\textbf{#1}}}
+\newcommand{\ruta}[1]{\texttt{#1}}
+\newcommand{\alertbox}[1]{\begin{block}{Importante}#1\end{block}}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+\end{frame}
+
+\begin{frame}{Objetivo del sistema}
+\begin{itemize}
+  \item Administrar prácticas HTML sin exigir conocimientos técnicos al personal docente.
+  \item Activar o desactivar aplicaciones mediante interruptores.
+  \item Controlar acceso mediante usuario, contraseña y rol.
+  \item Permitir que estudiantes entren solo a las prácticas autorizadas.
+  \item Registrar accesos e informes de uso.
+\end{itemize}
+\alertbox{Después de la instalación inicial, la administración cotidiana se realiza desde una página web con botones.}
+\end{frame}
+
+\begin{frame}{Arquitectura general}
+\centering
+\begin{tikzpicture}[node distance=1.3cm, every node/.style={font=\small}]
+\tikzstyle{box}=[rounded corners, draw=azul, thick, fill=fondo, align=center, minimum width=3.0cm, minimum height=.8cm]
+\node[box] (admin) {Administrador / Docente\\Panel de control};
+\node[box, right=of admin] (gas) {Google Apps Script\\Web App};
+\node[box, right=of gas] (sheet) {Google Sheet\\usuarios, estados, informes};
+\node[box, below=of sheet] (drive) {Google Drive\\HTML privados};
+\node[box, below=of admin] (student) {Estudiante\\Práctica autorizada};
+\draw[-{Latex}, thick] (admin) -- (gas);
+\draw[-{Latex}, thick] (student) -- (gas);
+\draw[-{Latex}, thick] (gas) -- (sheet);
+\draw[-{Latex}, thick] (gas) -- (drive);
+\end{tikzpicture}
+\vspace{.4cm}
+\small El usuario no toca JSON, GitHub, tokens ni configuraciones avanzadas. Todo se guarda en Google Sheets y Drive.
+\end{frame}
+
+\begin{frame}{Roles disponibles}
+\begin{tabular}{p{3cm}p{9.5cm}}
+\toprule
+\textbf{Rol} & \textbf{Permisos principales}\\
+\midrule
+ADMINISTRADOR & Crea usuarios, carga HTML, elimina aplicaciones, activa/desactiva, programa horarios, ve informes.\\
+DOCENTE & Activa/desactiva aplicaciones, programa horarios y ve informes. No administra usuarios ni carga HTML.\\
+ESTUDIANTE & Ingresa a prácticas autorizadas y genera/consulta sus propios informes.\\
+\bottomrule
+\end{tabular}
+\end{frame}
+
+\begin{frame}{Archivos incluidos en el comprimido}
+\begin{block}{Carpeta principal}
+\begin{itemize}
+  \item \ruta{apps\_script/Code.gs}: lógica del servidor.
+  \item \ruta{apps\_script/Index.html}: interfaz completa.
+  \item \ruta{apps\_script/appsscript.json}: configuración del proyecto.
+  \item \ruta{html\_para\_subir/}: prácticas HTML de ejemplo.
+  \item \ruta{documentacion/Tutorial\_Sistema\_HTML\_Seguro.pdf}: este tutorial.
+\end{itemize}
+\end{block}
+\alertbox{No edite el código salvo que quiera personalizar el sistema. La operación cotidiana se hace desde el panel.}
+\end{frame}
+
+\begin{frame}{Requisitos previos}
+\begin{itemize}
+  \item Una cuenta Google.
+  \item Acceso a Google Sheets y Google Apps Script.
+  \item Los archivos del comprimido descomprimidos en su computador.
+  \item Los HTML que desea cargar como prácticas.
+\end{itemize}
+\begin{block}{No se requiere}
+\begin{itemize}
+  \item Servidor propio.
+  \item GitHub.
+  \item Cloudflare.
+  \item Tarjeta de crédito.
+  \item Conocimientos de administración web para uso diario.
+\end{itemize}
+\end{block}
+\end{frame}
+
+\begin{frame}{Paso 1: crear la hoja base}
+\begin{enumerate}
+  \item Abra Google Sheets.
+  \item Cree una hoja nueva.
+  \item Asigne un nombre claro, por ejemplo:\\
+  \ruta{Sistema HTML Seguro - Control de prácticas}
+  \item No cree pestañas manualmente.
+\end{enumerate}
+\alertbox{El propio script creará las pestañas necesarias: USUARIOS, APLICACIONES, SESIONES, INFORMES y AUDITORIA.}
+\end{frame}
+
+\begin{frame}{Paso 2: abrir Apps Script}
+\begin{enumerate}
+  \item Dentro de la hoja, vaya a \boton{Extensiones}.
+  \item Seleccione \boton{Apps Script}.
+  \item Se abrirá un proyecto asociado a esa hoja.
+  \item Cambie el nombre del proyecto si lo desea.
+\end{enumerate}
+\begin{block}{Recomendación}
+Use un nombre fácil de reconocer, por ejemplo \ruta{SistemaHTMLSeguro}.
+\end{block}
+\end{frame}
+
+\begin{frame}{Paso 3: copiar Code.gs}
+\begin{enumerate}
+  \item En Apps Script, abra el archivo \ruta{Code.gs} existente.
+  \item Borre su contenido.
+  \item Abra el archivo del paquete:\\
+  \ruta{apps\_script/Code.gs}
+  \item Copie todo su contenido y péguelo en Apps Script.
+  \item Guarde el proyecto.
+\end{enumerate}
+\end{frame}
+
+\begin{frame}{Paso 4: crear Index.html}
+\begin{enumerate}
+  \item En Apps Script, haga clic en \boton{+} junto a \boton{Archivos}.
+  \item Seleccione \boton{HTML}.
+  \item Nombre el archivo exactamente:\\
+  \ruta{Index}
+  \item Abra \ruta{apps\_script/Index.html} del paquete.
+  \item Copie todo el contenido y péguelo en el archivo \ruta{Index.html}.
+  \item Guarde.
+\end{enumerate}
+\alertbox{El nombre debe ser \ruta{Index}; Apps Script añadirá la extensión .html automáticamente.}
+\end{frame}
+
+\begin{frame}{Paso 5: pegar appsscript.json}
+\begin{enumerate}
+  \item En Apps Script, abra \boton{Configuración del proyecto}.
+  \item Active \boton{Mostrar archivo de manifiesto appsscript.json}.
+  \item Vuelva al editor.
+  \item Abra \ruta{appsscript.json}.
+  \item Reemplace su contenido con el archivo:\\
+  \ruta{apps\_script/appsscript.json}
+  \item Guarde.
+\end{enumerate}
+\end{frame}
+
+\begin{frame}{Paso 6: autorizar permisos}
+\begin{enumerate}
+  \item En Apps Script, seleccione la función \ruta{doGet}.
+  \item Pulse \boton{Ejecutar}.
+  \item Google pedirá autorización.
+  \item Revise los permisos y acepte con la cuenta propietaria.
+\end{enumerate}
+\begin{block}{Permisos usados}
+\begin{itemize}
+  \item Google Sheets: guardar usuarios, estados e informes.
+  \item Google Drive: guardar los archivos HTML privados.
+\end{itemize}
+\end{block}
+\end{frame}
+
+\begin{frame}{Paso 7: desplegar como aplicación web}
+\begin{enumerate}
+  \item Pulse \boton{Implementar} o \boton{Deploy}.
+  \item Seleccione \boton{Nueva implementación}.
+  \item En tipo, elija \boton{Aplicación web}.
+  \item Configure:
+  \begin{itemize}
+    \item Ejecutar como: \boton{Yo}.
+    \item Quién tiene acceso: \boton{Cualquier persona con el enlace}.
+  \end{itemize}
+  \item Pulse \boton{Implementar}.
+  \item Copie la URL de la aplicación web.
+\end{enumerate}
+\alertbox{Esa URL será el panel único para administradores, docentes y estudiantes.}
+\end{frame}
+
+\begin{frame}{Paso 8: crear el primer ADMINISTRADOR}
+\begin{enumerate}
+  \item Abra la URL de la aplicación web.
+  \item Si no existen usuarios, aparecerá la pantalla de primer uso.
+  \item Cree el usuario ADMINISTRADOR inicial.
+  \item Use una contraseña de al menos 10 caracteres.
+\end{enumerate}
+\begin{block}{Sugerencia}
+Anote esta cuenta en un lugar seguro. Será la cuenta que puede crear docentes y estudiantes.
+\end{block}
+\end{frame}
+
+\begin{frame}{Paso 9: cargar aplicaciones HTML}
+\begin{enumerate}
+  \item Ingrese como ADMINISTRADOR.
+  \item Abra la pestaña \boton{Cargar HTML}.
+  \item Escriba un título visible.
+  \item Seleccione un archivo .html.
+  \item Pulse \boton{Subir aplicación}.
+\end{enumerate}
+\alertbox{Toda aplicación nueva queda DESACTIVADA por defecto. Esto evita publicarla accidentalmente.}
+\end{frame}
+
+\begin{frame}{Paso 10: activar o desactivar una práctica}
+\begin{enumerate}
+  \item Vaya a la pestaña \boton{Aplicaciones}.
+  \item Busque la práctica.
+  \item Cambie el interruptor \boton{Activada}.
+  \item El cambio queda guardado en la hoja central.
+\end{enumerate}
+\begin{block}{Quién puede hacerlo}
+\begin{itemize}
+  \item ADMINISTRADOR: sí.
+  \item DOCENTE: sí.
+  \item ESTUDIANTE: no.
+\end{itemize}
+\end{block}
+\end{frame}
+
+\begin{frame}{Paso 11: programar apertura y cierre}
+\begin{enumerate}
+  \item En cada aplicación verá campos \boton{Inicio} y \boton{Fin}.
+  \item Defina fecha y hora de apertura.
+  \item Defina fecha y hora de cierre.
+  \item La disponibilidad se calcula automáticamente.
+\end{enumerate}
+\begin{block}{Ejemplo}
+Una práctica puede estar activa, pero disponible solo entre 08:00 y 10:00.
+\end{block}
+\end{frame}
+
+\begin{frame}{Paso 12: crear usuarios}
+\begin{enumerate}
+  \item Ingrese como ADMINISTRADOR.
+  \item Abra la pestaña \boton{Usuarios}.
+  \item Pulse \boton{Nuevo usuario}.
+  \item Complete usuario, nombre, rol y contraseña.
+  \item Seleccione prácticas permitidas.
+  \item Guarde.
+\end{enumerate}
+\alertbox{Para ESTUDIANTE, marque solo las prácticas a las que debe entrar. Puede usar Todas (*) si corresponde.}
+\end{frame}
+
+\begin{frame}{Uso del DOCENTE}
+\begin{itemize}
+  \item Ingresa con su usuario y contraseña.
+  \item Ve la lista de aplicaciones.
+  \item Puede activar/desactivar prácticas.
+  \item Puede programar inicio y fin.
+  \item Puede ver informes.
+  \item No puede crear usuarios ni cargar HTML.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Uso del ESTUDIANTE}
+\begin{itemize}
+  \item Ingresa con su usuario y contraseña.
+  \item Ve solo las prácticas disponibles y autorizadas.
+  \item Abre la práctica dentro del sistema.
+  \item Puede generar un informe de uso.
+  \item Ve solo sus propios registros.
+\end{itemize}
+\alertbox{El estudiante no tiene funciones de activación, carga o administración.}
+\end{frame}
+
+\begin{frame}{Medidas de protección incluidas}
+\begin{itemize}
+  \item Usuario y contraseña.
+  \item Roles verificados en servidor.
+  \item Activación/desactivación central.
+  \item Horarios de disponibilidad.
+  \item HTML almacenado en Drive, no como archivo público directo.
+  \item Bloqueo de ejecución local de copias servidas.
+  \item Bloqueo disuasorio de clic derecho y atajos comunes.
+  \item Aviso de propiedad intelectual e instrucción para IA.
+  \item Registro de auditoría e informes.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Aviso sobre IA y propiedad intelectual}
+\small
+El sistema inyecta en cada práctica un aviso que indica que el contenido es privado, restringido y no autorizado para reproducción, extracción o reconstrucción mediante herramientas automatizadas o IA.
+
+\vspace{.3cm}
+\begin{block}{Alcance real}
+Este aviso sirve como advertencia, evidencia de condiciones de uso y disuasión. No sustituye los controles técnicos.
+\end{block}
+\begin{block}{Protección más importante}
+El HTML se entrega solo después de login y autorización. Las copias locales normales quedan bloqueadas.
+\end{block}
+\end{frame}
+
+\begin{frame}{Limitaciones honestas}
+\begin{itemize}
+  \item Ningún sistema web puede impedir absolutamente una foto o captura de pantalla.
+  \item Un usuario autorizado puede ver la pregunta que se le muestra.
+  \item El bloqueo de clic derecho es disuasorio, no infalible.
+  \item Para máxima seguridad, las respuestas correctas deberían evaluarse fuera del HTML original.
+\end{itemize}
+\alertbox{El objetivo es impedir la distribución libre, controlar accesos y hacer inútiles las copias locales normales.}
+\end{frame}
+
+\begin{frame}{Informes y auditoría}
+\begin{itemize}
+  \item Cada ingreso se registra.
+  \item Cada apertura de práctica se registra.
+  \item Cada informe generado se registra.
+  \item Administradores y docentes ven registros globales.
+  \item Estudiantes ven únicamente sus propios registros.
+\end{itemize}
+\begin{block}{Exportación}
+Desde el panel se puede descargar un archivo CSV de informes.
+\end{block}
+\end{frame}
+
+\begin{frame}{Prueba recomendada antes de usar con estudiantes}
+\begin{enumerate}
+  \item Crear un usuario DOCENTE de prueba.
+  \item Crear un usuario ESTUDIANTE de prueba.
+  \item Cargar una aplicación HTML.
+  \item Verificar que nace desactivada.
+  \item Activarla como DOCENTE.
+  \item Entrar como ESTUDIANTE.
+  \item Abrir la práctica.
+  \item Desactivarla y comprobar que ya no abre.
+\end{enumerate}
+\end{frame}
+
+\begin{frame}{Problemas frecuentes}
+\begin{tabular}{p{4.3cm}p{8.3cm}}
+\toprule
+\textbf{Problema} & \textbf{Solución}\\
+\midrule
+No aparece el primer administrador & Verifique que la hoja no tenga usuarios en la pestaña USUARIOS.\\
+No carga un HTML & Confirme que el archivo tenga extensión .html o .htm.\\
+El estudiante no ve la práctica & Revise que esté activada, dentro de horario y asignada al usuario.\\
+Docente no puede crear usuarios & Es correcto: solo ADMINISTRADOR gestiona usuarios.\\
+Se pide autorización de Google & Acepte con la cuenta propietaria del sistema.\\
+\bottomrule
+\end{tabular}
+\end{frame}
+
+\begin{frame}{Buenas prácticas}
+\begin{itemize}
+  \item Use contraseñas de al menos 10 caracteres.
+  \item No comparta la cuenta ADMINISTRADOR.
+  \item Cree una cuenta DOCENTE para cada profesor responsable.
+  \item Desactive prácticas que ya no estén en uso.
+  \item Use horarios para evaluaciones o refuerzos temporales.
+  \item Descargue informes periódicamente si necesita respaldo externo.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Resumen operativo}
+\centering
+\begin{tikzpicture}[node distance=.7cm, every node/.style={font=\small}]
+\tikzstyle{box}=[rounded corners, draw=azul, thick, fill=fondo, align=center, minimum width=8cm, minimum height=.65cm]
+\node[box] (a) {Administrador instala una vez};
+\node[box, below=of a] (b) {Carga HTML desde el panel};
+\node[box, below=of b] (c) {Crea docentes y estudiantes};
+\node[box, below=of c] (d) {Docente activa/desactiva con clics};
+\node[box, below=of d] (e) {Estudiante ingresa con contraseña};
+\node[box, below=of e] (f) {Sistema registra acceso e informes};
+\draw[-{Latex}, thick] (a)--(b);\draw[-{Latex}, thick] (b)--(c);\draw[-{Latex}, thick] (c)--(d);\draw[-{Latex}, thick] (d)--(e);\draw[-{Latex}, thick] (e)--(f);
+\end{tikzpicture}
+\end{frame}
+
+\begin{frame}{Cierre}
+\centering
+\Large Sistema listo para administración por clics
+
+\vspace{.5cm}
+\normalsize
+Administrador configura una vez.\par
+Docente controla disponibilidad.\par
+Estudiante accede solo a lo autorizado.\par
+
+\vspace{.6cm}
+\alertbox{Guarde la URL de la aplicación web y la cuenta ADMINISTRADOR inicial.}
+\end{frame}
+
+\end{document}
